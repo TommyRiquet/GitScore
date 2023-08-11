@@ -1,1 +1,1 @@
-# GitCleaner
+# GitScore
