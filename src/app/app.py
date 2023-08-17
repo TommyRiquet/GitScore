@@ -1,9 +1,8 @@
 ''' App class '''
-import argparse
 import os
 
 from gitscore.gitscore import GitScore
-
+from ui.ui import UI
 
 class App:
     ''' Class to score a git repository '''
@@ -13,19 +12,9 @@ class App:
 
     def main(self):
         ''' Main method '''
-        arg_parser = argparse.ArgumentParser()
-        arg_parser.add_argument(
-            "-g", "--git-repo", help="The path to the git repository folder to score")
-        arg_parser.add_argument(
-            "-r", "--remote", help="The url for the remote github repository to score")
-        args = arg_parser.parse_args()
+        user_interface = UI()
+        user_interface.main()
 
-        if self.has_local_repo(args):
-            self.check_if_valid(args.git_repo)
-        elif self.has_remote_repo(args):
-            self.get_remote_repo(args.remote)
-        else:
-            print("No git repository path provided")
 
     def has_remote_repo(self, args):
         ''' Checks if the remote repo arg is provided
