@@ -1,6 +1,6 @@
 ''' GitScore class to score a git repository '''
-import os
 import re
+import requests
 
 
 class GitScore:
@@ -13,17 +13,20 @@ class GitScore:
         self.merge_commits = []
         self.conventional_commits = False
 
-    def get_all_commits(self, path):
-        ''' Gets the git log for the repository
-            :param path: The path to the git repository
-        '''
-        all_commits = os.popen("git -C " + path + " log --oneline").read()
-        return all_commits
-
-    def get_score(self, path):
+    def get_score(self, url):
         ''' Gets the git score for the repository '''
 
-        all_commits = self.get_all_commits(path)
+        repo_informations = self.get_repo_informations(url)
+
+        if repo_informations is None or 'message' in repo_informations:
+            return None
+
+        all_commits = self.get_all_commits(
+            repo_informations['owner']['login'], repo_informations['name'])
+
+        if all_commits is None or len(all_commits) == 0:
+            return None
+
         commit_count = self.get_commit_count(all_commits)
 
         duplicate_commits = self.get_duplicate_commits(all_commits)
@@ -32,17 +35,72 @@ class GitScore:
         git_score = self.get_git_score(
             commit_count, duplicate_commits, merge_commits)
 
-        print(f'Total commits: {str(commit_count)}')
-        print(f'Duplicate commits: {str(len(duplicate_commits))}')
-        print(f'Merge commits: {str(len(merge_commits))}')
-        print(f'Conventional commits: {str(self.is_repo_following_conventionnal_commits(path))}')
-        print(f'Git score: {str(git_score)}')
+        is_conventional_commits = self.is_repo_following_conventionnal_commits(
+            all_commits)
+
+        return {
+            'repo_name': repo_informations['name'],
+            'repo_description': repo_informations['description'],
+            'repo_language': repo_informations['language'],
+            'owner_name': repo_informations['owner']['login'],
+            'total_commits': commit_count,
+            'duplicate_commits': duplicate_commits,
+            'merge_commits': merge_commits,
+            'conventional_commits': is_conventional_commits,
+            'git_score': git_score
+        }
+
+    def get_repo_informations(self, url):
+        ''' Gets the repository informations
+            :param url: The url to the git repository
+        '''
+        try:
+            repo_owner = url.split('/')[0]
+            repo_name = url.split('/')[1]
+
+            response = requests.get(
+                f'https://api.github.com/repos/{repo_owner}/{repo_name}',
+                timeout=5
+            )
+            return response.json()
+
+        except (TypeError, IndexError):
+            return None
+
+    def get_all_commits(self, repo_owner, repo_name):
+        ''' Gets the git commits for the repository
+            :param url: The url to the git repository
+        '''
+        try:
+            all_commits = []
+
+            def fetch_commits(page):
+                response = requests.get(
+                    f'https://api.github.com/repos/{repo_owner}/{repo_name}' +
+                    f'/commits?per_page=100&page={page}',
+                    timeout=5
+                )
+                return response.json()
+
+            page = 1
+            response_data = fetch_commits(page)
+
+            while response_data:
+                all_commits.extend([commit['commit']['message']
+                                    for commit in response_data])
+                page += 1
+                response_data = fetch_commits(page)
+
+        except (TypeError, IndexError):
+            all_commits = None
+
+        return all_commits
 
     def get_commit_count(self, all_commits):
         ''' Gets the total number of commits
             :param all_commits: The git log
         '''
-        return len(all_commits.splitlines())
+        return len(all_commits)
 
     def get_git_score(self, commit_count, duplicate_commits, merge_commits):
         ''' Gets the git score for the repository
@@ -73,12 +131,9 @@ class GitScore:
             :param all_commits: The git log 
         '''
         duplicate_commits = []
-        commits = all_commits.splitlines()
 
-        commits = [commit[8:] for commit in commits]
-
-        for commit in commits:
-            if commits.count(commit) > 1:
+        for commit in all_commits:
+            if all_commits.count(commit) > 1:
                 duplicate_commits.append(commit)
         return duplicate_commits
 
@@ -87,24 +142,21 @@ class GitScore:
             :param all_commits: The git log
         '''
         merge_commits = []
-        commits = all_commits.splitlines()
 
-        for commit in commits:
+        for commit in all_commits:
             if "Merge" in commit:
                 merge_commits.append(commit)
         return merge_commits
 
-    def is_repo_following_conventionnal_commits(self, path):
+    def is_repo_following_conventionnal_commits(self, all_commits):
         ''' Checks if the repository is following the conventional commits
-                :param path: The path to the git repository
+                :param all_commits: The git log 
         '''
-        commits = self.get_all_commits(path)
-        commits = commits.splitlines()
 
-        commits = [commit[8:] for commit in commits]
-
-        for commit in commits:
-            if re.match(r'^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)', commit):
+        for commit in all_commits:
+            if re.match(
+                r'^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)' +
+                    r'{1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)', commit):
                 continue
             else:
                 return False
