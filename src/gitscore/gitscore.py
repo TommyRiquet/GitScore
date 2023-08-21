@@ -152,8 +152,7 @@ class GitScore:
         ''' Checks if the repository is following the conventional commits
                 :param all_commits: The git log 
         '''
-
-        for commit in all_commits:
+        for commit in all_commits[:-1]:
             if re.match(
                 r'^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)' +
                     r'{1}(\([\w\-\.]+\))?(!)?: ([\w ])+([\s\S]*)', commit):
