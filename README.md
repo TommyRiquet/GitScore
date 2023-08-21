@@ -7,6 +7,8 @@
 
 GitScore is a Python-based tool that evaluates GitHub repositories using various criteria, such as duplicate commits, merges, and adherence to conventional commit messages.
 
+![ui](https://raw.githubusercontent.com/TommyRiquet/GitScore/main/docs/ui.png)
+
 ## Features
 
 - Analyze GitHub repositories based on commit quality.
